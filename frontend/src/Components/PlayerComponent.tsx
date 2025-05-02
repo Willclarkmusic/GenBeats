@@ -1,55 +1,129 @@
-// src/components/PlayerComponent.tsx
-import React, { useEffect, useRef, useState } from 'react';
-import * as Tone from 'tone';
+import React, { useState, useRef, useEffect } from "react";
+import * as Tone from "tone";
 
-interface PlayerProps {
-  currentTrack: string | null;
-  isGenerating: boolean;
+interface BasicPlayerProps {
+  audioUrl: string | null;
   onNext: () => void;
   onPrev: () => void;
+  nextReady: boolean;
+  prevReady: boolean;
+  isGenerating: boolean;
 }
 
-const PlayerComponent: React.FC<PlayerProps> = ({ currentTrack, isGenerating, onNext, onPrev }) => {
+const BasicPlayer: React.FC<BasicPlayerProps> = ({
+  audioUrl,
+  onNext,
+  onPrev,
+  nextReady,
+  prevReady,
+  isGenerating,
+}) => {
   const playerRef = useRef<Tone.Player | null>(null);
+  const volumeRef = useRef<Tone.Volume | null>(null);
+
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [volume, setVolume] = useState(90); // 0 to 100
 
   useEffect(() => {
-    if (currentTrack) {
-      playerRef.current?.dispose();
-
-      playerRef.current = new Tone.Player(currentTrack, () => {
-        playerRef.current?.toDestination();
-        if (isPlaying) playerRef.current?.start();
-      }).toDestination();
-    }
-  }, [currentTrack]);
-
-  const togglePlay = async () => {
-    if (!playerRef.current) return;
-    await Tone.start(); // Unlock audio context
-
-    if (isPlaying) {
+    // Reset player when track changes
+    if (playerRef.current) {
       playerRef.current.stop();
-    } else {
-      playerRef.current.start();
+      playerRef.current.dispose();
+      playerRef.current = null;
     }
+    if (volumeRef.current) {
+      volumeRef.current.dispose();
+      volumeRef.current = null;
+    }
+    setIsPlaying(false);
+    setIsLoaded(false);
+  }, [audioUrl]);
 
-    setIsPlaying(!isPlaying);
+  const handlePlay = async () => {
+    console.log(audioUrl);
+    await Tone.start(); // ✅ required for audio context unlock
+
+    if (!playerRef.current) {
+      const vol = new Tone.Volume(Tone.gainToDb(volume / 100)).toDestination();
+      volumeRef.current = vol;
+
+      const player = new Tone.Player(audioUrl || "", () => {
+        setIsLoaded(true);
+        player.toDestination();
+        playerRef.current = player;
+        player.start();
+        setIsPlaying(true);
+      }).connect(vol);
+    } else {
+      if (isPlaying) {
+        playerRef.current.stop();
+        setIsPlaying(false);
+      } else {
+        playerRef.current.start();
+        setIsPlaying(true);
+      }
+    }
+  };
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newVolume = parseInt(e.target.value, 10);
+    setVolume(newVolume);
+    if (volumeRef.current) {
+      volumeRef.current.volume.value = Tone.gainToDb(newVolume / 100);
+    }
+  };
+
+  const getTitleFromUrl = (url: string | null) => {
+    const parts = url?.split("/") || "";
+    return parts[parts.length - 1];
   };
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      <div className="flex gap-4">
-        <button onClick={onPrev} className="bg-gray-800 px-4 py-2 rounded">Prev</button>
-        <button onClick={togglePlay} className="bg-indigo-600 px-6 py-2 rounded font-bold">
-          {isPlaying ? 'Pause' : 'Play'}
+    <div
+      style={{
+        textAlign: "center",
+        fontFamily: "sans-serif",
+        marginTop: "2rem",
+      }}
+    >
+      <h3>{getTitleFromUrl(audioUrl)}</h3>
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: "1rem",
+          marginBottom: "1rem",
+        }}
+      >
+        <button onClick={onPrev} disabled={!prevReady}>
+          ⏮️
         </button>
-        <button onClick={onNext} className="bg-gray-800 px-4 py-2 rounded">
-          {isGenerating ? 'Generating...' : 'Next'}
+        <button onClick={handlePlay}>
+          {isPlaying ? "⏸️" : isLoaded ? "▶️" : "🔄"}
+        </button>
+        <button onClick={onNext} disabled={!nextReady}>
+          ⏭️
         </button>
       </div>
+
+      <div>
+        <label>
+          Volume: {volume}
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={volume}
+            onChange={handleVolumeChange}
+            style={{ marginLeft: "0.5rem" }}
+          />
+        </label>
+      </div>
+      <h1>{isGenerating ? "1" : "0"}</h1>
     </div>
   );
 };
 
-export default PlayerComponent;
+export default BasicPlayer;

@@ -25,9 +25,9 @@ const AIControlComponent: React.FC<AIControlProps> = ({
   };
 
   const handleGeneratePrompt = () => {
-    const generatedPrompt = `${selectedSpeed} bpm ${selectedMood} ${selectedTags.join(
+    const generatedPrompt = `${selectedSpeed} ${prompt} bpm ${selectedMood} ${selectedTags.join(
       " "
-    )} lofi slow bpm electro chill with organic samples`;
+    )} lofi electro chill with organic samples`;
     onPromptChange(generatedPrompt);
   };
 
